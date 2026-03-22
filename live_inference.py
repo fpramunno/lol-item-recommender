@@ -152,22 +152,19 @@ BANNER_LINES = [
 # ANSI 256-color rainbow cycle (bright 80s palette)
 RAINBOW = [196, 202, 208, 214, 220, 226, 154, 46, 51, 39, 27, 57, 129, 165, 201]
 
-def rainbow_line(text: str, offset: int) -> str:
-    out = ""
-    color_idx = offset
-    for ch in text:
-        if ch.strip():
-            color = RAINBOW[color_idx % len(RAINBOW)]
-            out += f"\x1b[38;5;{color}m{ch}"
-            color_idx += 1
-        else:
-            out += ch
-    return out + "\x1b[0m"
-
 def print_banner():
     print()
-    for i, line in enumerate(BANNER_LINES):
-        print(rainbow_line(line, i * 3))
+    color_idx = 0
+    for line in BANNER_LINES:
+        out = ""
+        for ch in line:
+            if ch.strip():
+                color = RAINBOW[color_idx % len(RAINBOW)]
+                out += f"\x1b[38;5;{color}m{ch}"
+                color_idx += 1
+            else:
+                out += ch
+        print(out + "\x1b[0m")
     print()
 
 def run():
