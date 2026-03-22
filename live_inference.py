@@ -139,18 +139,39 @@ def get_buyer_items(raw: dict) -> frozenset:
         return frozenset()
 
 
-BANNER = r"""
-  ████████╗███████╗ █████╗  ██████╗██╗  ██╗███████╗██████╗
-  ╚══██╔══╝██╔════╝██╔══██╗██╔════╝██║  ██║██╔════╝██╔══██╗
-     ██║   █████╗  ███████║██║     ███████║█████╗  ██████╔╝
-     ██║   ██╔══╝  ██╔══██║██║     ██╔══██║██╔══╝  ██╔══██╗
-     ██║   ███████╗██║  ██║╚██████╗██║  ██║███████╗██║  ██║
-     ╚═╝   ╚══════╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
-          LoL Item Recommender — Real-Time AI Advisor
-"""
+BANNER_LINES = [
+    "  ████████╗███████╗ █████╗  ██████╗██╗  ██╗███████╗██████╗ ",
+    "  ╚══██╔══╝██╔════╝██╔══██╗██╔════╝██║  ██║██╔════╝██╔══██╗",
+    "     ██║   █████╗  ███████║██║     ███████║█████╗  ██████╔╝ ",
+    "     ██║   ██╔══╝  ██╔══██║██║     ██╔══██║██╔══╝  ██╔══██╗ ",
+    "     ██║   ███████╗██║  ██║╚██████╗██║  ██║███████╗██║  ██║ ",
+    "     ╚═╝   ╚══════╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝",
+    "          LoL Item Recommender — Real-Time AI Advisor        ",
+]
+
+# ANSI 256-color rainbow cycle (bright 80s palette)
+RAINBOW = [196, 202, 208, 214, 220, 226, 154, 46, 51, 39, 27, 57, 129, 165, 201]
+
+def rainbow_line(text: str, offset: int) -> str:
+    out = ""
+    color_idx = offset
+    for ch in text:
+        if ch.strip():
+            color = RAINBOW[color_idx % len(RAINBOW)]
+            out += f"\x1b[38;5;{color}m{ch}"
+            color_idx += 1
+        else:
+            out += ch
+    return out + "\x1b[0m"
+
+def print_banner():
+    print()
+    for i, line in enumerate(BANNER_LINES):
+        print(rainbow_line(line, i * 3))
+    print()
 
 def run():
-    print(BANNER)
+    print_banner()
     print("  Updates automatically when you buy an item.")
     print("  Press ENTER to refresh manually, Ctrl+C to exit.")
     print("  " + "─" * 56)
