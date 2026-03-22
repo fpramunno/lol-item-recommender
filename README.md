@@ -55,7 +55,7 @@ cp .env.example .env
 ```
 
 Download the model checkpoint from Google Drive and place it in `checkpoints/best_model.pt`:
-> **[Download checkpoint](https://drive.google.com/your-link-here)**
+> **[Download checkpoint](https://drive.google.com/file/d/191ur4DDl3m7wdojLIOvzIHJvwtyUbFDK/view?usp=drive_link)**
 
 ---
 
