@@ -1,0 +1,9 @@
+requests
+aiohttp
+python-dotenv
+tqdm
+numpy
+wandb
+torch
+torchvision
+matplotlib

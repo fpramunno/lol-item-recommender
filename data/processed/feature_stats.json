@@ -1,0 +1,38 @@
+{
+  "game_time_min": {
+    "min": 1.4,
+    "max": 54.75
+  },
+  "team_gold_diff": {
+    "min": -20141.0,
+    "max": 20141.0
+  },
+  "level": {
+    "min": 1.0,
+    "max": 20.0
+  },
+  "kills": {
+    "min": 0.0,
+    "max": 43.0
+  },
+  "deaths": {
+    "min": 0.0,
+    "max": 23.0
+  },
+  "assists": {
+    "min": 0.0,
+    "max": 45.0
+  },
+  "cs": {
+    "min": 0.0,
+    "max": 554.0
+  },
+  "gold_spent": {
+    "min": 0.0,
+    "max": 46775.0
+  },
+  "gold_current": {
+    "min": 0.0,
+    "max": 9608.0
+  }
+}

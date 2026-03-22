@@ -1,0 +1,34 @@
+# Environment
+.env
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Large data files (not tracked in git)
+data/timelines/
+data/dataset/
+data/match_ids.txt
+data/match_results.json
+data/match_participants.json
+data/processed/X.npy
+data/processed/y.npy
+data/processed/R.npy
+
+# Checkpoints (hosted on Google Drive)
+checkpoints/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Wandb
+wandb/
+
+# Sensitive / personal data
+api_key_wandb.txt
+data/puuids.txt
+
+# OS
+.DS_Store
+Thumbs.db
