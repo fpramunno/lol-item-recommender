@@ -1,4 +1,4 @@
-# LoL Item Recommender
+# TEACHER
 
 A machine learning model that recommends the next best item to buy in League of Legends, based on the current game state (champion, role, KDA, CS, gold, items owned, team composition, runes).
 
