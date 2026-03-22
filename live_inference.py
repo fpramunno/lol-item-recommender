@@ -139,12 +139,21 @@ def get_buyer_items(raw: dict) -> frozenset:
         return frozenset()
 
 
+BANNER = r"""
+  ████████╗███████╗ █████╗  ██████╗██╗  ██╗███████╗██████╗
+  ╚══██╔══╝██╔════╝██╔══██╗██╔════╝██║  ██║██╔════╝██╔══██╗
+     ██║   █████╗  ███████║██║     ███████║█████╗  ██████╔╝
+     ██║   ██╔══╝  ██╔══██║██║     ██╔══██║██╔══╝  ██╔══██╗
+     ██║   ███████╗██║  ██║╚██████╗██║  ██║███████╗██║  ██║
+     ╚═╝   ╚══════╝╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
+          LoL Item Recommender — Real-Time AI Advisor
+"""
+
 def run():
-    print("=" * 60)
-    print("LoL Item Recommender — Live Mode")
-    print("Updates automatically when you buy an item.")
-    print("Press ENTER to refresh manually, Ctrl+C to exit.")
-    print("=" * 60)
+    print(BANNER)
+    print("  Updates automatically when you buy an item.")
+    print("  Press ENTER to refresh manually, Ctrl+C to exit.")
+    print("  " + "─" * 56)
 
     last_items: frozenset = frozenset()
     last_refresh: float = 0.0
