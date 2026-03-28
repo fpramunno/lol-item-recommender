@@ -229,8 +229,7 @@ hr {
 </style>
 """, unsafe_allow_html=True)
 
-# ── Parse CLI args ────────────────────────────────────────────────────────────
-@st.cache_resource
+# ── Parse CLI args (no cache — must read sys.argv fresh every startup) ────────
 def _parse_cli():
     parser = argparse.ArgumentParser(add_help=False)
     group = parser.add_mutually_exclusive_group()
@@ -244,20 +243,22 @@ def _parse_cli():
         args = parser.parse_args([])
     return args
 
+_cli  = _parse_cli()
+_arch = "mlp" if _cli.mlp else ("transformer" if _cli.transformer else None)
+
 
 # ── Load inference module once ────────────────────────────────────────────────
 @st.cache_resource(show_spinner="[ LOADING MODEL... ]")
 def _load_inf(arch: str | None, checkpoint: str | None):
     import inference as _inf
-    if arch:
-        _inf.model = _inf.load_model(arch=arch)
-    elif checkpoint:
-        _inf.model = _inf.load_model(checkpoint=checkpoint)
+    # Always override — inference.py loads a default model at import time
+    _inf.model = _inf.load_model(
+        arch=arch,
+        checkpoint=checkpoint,
+    )
     return _inf
 
-_cli  = _parse_cli()
-_arch = "mlp" if _cli.mlp else ("transformer" if _cli.transformer else None)
-inf   = _load_inf(arch=_arch, checkpoint=_cli.checkpoint)
+inf = _load_inf(arch=_arch, checkpoint=_cli.checkpoint)
 
 # ── Data Dragon version ───────────────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
