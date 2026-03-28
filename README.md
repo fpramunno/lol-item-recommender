@@ -68,7 +68,7 @@ cp .env.example .env
 ```
 
 Download a model checkpoint from Google Drive and place it under `checkpoints/`:
-> **[Download checkpoint](https://drive.google.com/file/d/191ur4DDl3m7wdojLIOvzIHJvwtyUbFDK/view?usp=drive_link)**
+> **[Download checkpoint](https://drive.google.com/drive/folders/141aMKdmWNnapXo9F_5yyllljTKNysuTe?usp=sharing)**
 
 ---
 
@@ -113,8 +113,8 @@ streamlit run app.py -- --mlp
 python live_inference.py --mlp
 
 # Load a specific checkpoint
-streamlit run app.py -- --checkpoint checkpoints/transformer/2026-03-28_21-00-00/best_model.pt
-python live_inference.py --checkpoint checkpoints/transformer/2026-03-28_21-00-00/best_model.pt
+streamlit run app.py -- --checkpoint checkpoints/transformer/best_model_TRANSFORMER.pt
+python live_inference.py --checkpoint checkpoints/transformer/best_model_TRANSFORMER.pt
 ```
 
 If no flag is given, the best available checkpoint is loaded automatically.
