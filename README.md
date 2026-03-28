@@ -76,15 +76,20 @@ Download a model checkpoint from Google Drive and place it under `checkpoints/`:
 
 Start a League of Legends game, then choose your preferred interface:
 
-### Browser UI (recommended)
+### Option A — Browser UI (recommended)
 
 ```bash
 streamlit run app.py
 ```
 
-A browser window opens automatically. The app fetches live game data every 5 seconds and shows the top-5 recommended items with icons and confidence bars. No input needed — everything is read from the running game.
+This opens a browser window automatically at `http://localhost:8501`. The app polls the live game every 5 seconds and shows the top-5 recommended items with icons and confidence bars. No input needed — everything is read from the running game.
 
-### Terminal
+> **First time?** Make sure Streamlit is installed:
+> ```bash
+> pip install streamlit
+> ```
+
+### Option B — Terminal
 
 ```bash
 python live_inference.py
