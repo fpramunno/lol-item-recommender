@@ -247,18 +247,17 @@ def _parse_cli():
 
 # ── Load inference module once ────────────────────────────────────────────────
 @st.cache_resource(show_spinner="[ LOADING MODEL... ]")
-def _load_inf():
+def _load_inf(arch: str | None, checkpoint: str | None):
     import inference as _inf
-    cli = _parse_cli()
-    if cli.mlp:
-        _inf.model = _inf.load_model(arch="mlp")
-    elif cli.transformer:
-        _inf.model = _inf.load_model(arch="transformer")
-    elif cli.checkpoint:
-        _inf.model = _inf.load_model(checkpoint=cli.checkpoint)
+    if arch:
+        _inf.model = _inf.load_model(arch=arch)
+    elif checkpoint:
+        _inf.model = _inf.load_model(checkpoint=checkpoint)
     return _inf
 
-inf = _load_inf()
+_cli  = _parse_cli()
+_arch = "mlp" if _cli.mlp else ("transformer" if _cli.transformer else None)
+inf   = _load_inf(arch=_arch, checkpoint=_cli.checkpoint)
 
 # ── Data Dragon version ───────────────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
