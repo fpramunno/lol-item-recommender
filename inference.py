@@ -19,7 +19,11 @@ def load_model(checkpoint: str = None, arch: str = None):
         model_path = Path(checkpoint)
     elif arch:
         # match by config name (e.g. "transformer", "transformer_large", "mlp")
-        candidates = list(CHECKPOINT_DIR.glob(f"*{arch}*/*/best_model.pt"))
+        # supports both checkpoints/mlp/best_model.pt and checkpoints/mlp/<datetime>/best_model.pt
+        candidates = (
+            list(CHECKPOINT_DIR.glob(f"*{arch}*/*/best_model.pt")) +
+            list(CHECKPOINT_DIR.glob(f"*{arch}*/best_model.pt"))
+        )
         if not candidates:
             raise FileNotFoundError(f"No best_model.pt found matching '{arch}' in checkpoints/")
         # Pick the one with lowest val_loss stored in the checkpoint
