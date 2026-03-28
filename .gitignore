@@ -15,8 +15,9 @@ data/processed/X.npy
 data/processed/y.npy
 data/processed/R.npy
 
-# Checkpoints (hosted on Google Drive)
-checkpoints/
+# Checkpoints — ignore model weights, keep directory structure
+checkpoints/**/*.pt
+checkpoints/**/*.pth
 
 # Jupyter
 .ipynb_checkpoints/
