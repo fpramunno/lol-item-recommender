@@ -38,7 +38,10 @@ def load_model(checkpoint: str = None, arch: str = None):
         if legacy.exists():
             model_path = legacy
         else:
-            candidates = sorted(CHECKPOINT_DIR.glob("*/*/best_model.pt"))
+            candidates = sorted(
+                list(CHECKPOINT_DIR.glob("*/*/best_model.pt")) +
+                list(CHECKPOINT_DIR.glob("*/best_model.pt"))
+            )
             if not candidates:
                 raise FileNotFoundError("No best_model.pt found in checkpoints/")
             model_path = candidates[-1]
