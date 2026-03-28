@@ -32,3 +32,7 @@ data/puuids.txt
 # OS
 .DS_Store
 Thumbs.db
+
+# Data
+data/
+

@@ -73,6 +73,19 @@ CHAMPION_TAGS = ["Fighter", "Tank", "Mage", "Assassin", "Marksman", "Support"]
 ROLES         = ["TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY"]
 CHAMP_STAT_KEYS_LEN = 13
 
+TREE_IDS         = [8000, 8100, 8200, 8300, 8400]
+KEYSTONE_IDS     = [8005, 8008, 8010, 8021, 8112, 8124, 8128, 9923,
+                    8214, 8229, 8230, 8351, 8360, 8369, 8437, 8439, 8465]
+STAT_OFFENSE_IDS = [5005, 5007, 5008]
+STAT_FLEX_IDS    = [5001, 5007, 5008]
+STAT_DEFENSE_IDS = [5001, 5011, 5013]
+
+TREE_IDX         = {v: i for i, v in enumerate(TREE_IDS)}
+KEYSTONE_IDX     = {v: i for i, v in enumerate(KEYSTONE_IDS)}
+STAT_OFFENSE_IDX = {v: i for i, v in enumerate(STAT_OFFENSE_IDS)}
+STAT_FLEX_IDX    = {v: i for i, v in enumerate(STAT_FLEX_IDS)}
+STAT_DEFENSE_IDX = {v: i for i, v in enumerate(STAT_DEFENSE_IDS)}
+
 # ── Encoding ──────────────────────────────────────────────────────────────────
 
 def norm(value, feat):
@@ -131,7 +144,30 @@ def encode_state(game_state: dict) -> torch.Tensor:
         # Normalized champion base stats (13)
         stats_vec = champ_stats_norm_inf.get(cid, np.zeros(CHAMP_STAT_KEYS_LEN, dtype=np.float32))
 
-        player_feats.append(np.concatenate([numeric, item_vec, champ_vec, tags_vec, role_vec, stats_vec]))
+        # Rune encoding
+        keystone_vec  = np.zeros(len(KEYSTONE_IDS),     dtype=np.float32)
+        primary_vec   = np.zeros(len(TREE_IDS),         dtype=np.float32)
+        secondary_vec = np.zeros(len(TREE_IDS),         dtype=np.float32)
+        stat_off_vec  = np.zeros(len(STAT_OFFENSE_IDS), dtype=np.float32)
+        stat_flx_vec  = np.zeros(len(STAT_FLEX_IDS),    dtype=np.float32)
+        stat_def_vec  = np.zeros(len(STAT_DEFENSE_IDS), dtype=np.float32)
+        kidx = KEYSTONE_IDX.get(p.get("keystone", 0))
+        if kidx is not None: keystone_vec[kidx] = 1.0
+        pidx = TREE_IDX.get(p.get("primary_tree", 0))
+        if pidx is not None: primary_vec[pidx] = 1.0
+        sidx = TREE_IDX.get(p.get("secondary_tree", 0))
+        if sidx is not None: secondary_vec[sidx] = 1.0
+        oidx = STAT_OFFENSE_IDX.get(p.get("stat_offense", 0))
+        if oidx is not None: stat_off_vec[oidx] = 1.0
+        fidx = STAT_FLEX_IDX.get(p.get("stat_flex", 0))
+        if fidx is not None: stat_flx_vec[fidx] = 1.0
+        didx = STAT_DEFENSE_IDX.get(p.get("stat_defense", 0))
+        if didx is not None: stat_def_vec[didx] = 1.0
+
+        player_feats.append(np.concatenate([
+            numeric, item_vec, champ_vec, tags_vec, role_vec, stats_vec,
+            keystone_vec, primary_vec, secondary_vec, stat_off_vec, stat_flx_vec, stat_def_vec,
+        ]))
 
     x = np.concatenate([global_feats] + player_feats)
     return torch.tensor(x, dtype=torch.float32).unsqueeze(0)
@@ -169,7 +205,8 @@ def recommend(game_state: dict, top_k: int = 5):
 
 # ── Test scenarios ─────────────────────────────────────────────────────────────
 
-def make_player(pid, team, champion_id, role, level, kills, deaths, assists, cs, gold_spent, items, is_buyer, gold_current=0):
+def make_player(pid, team, champion_id, role, level, kills, deaths, assists, cs, gold_spent, items, is_buyer, gold_current=0,
+                keystone=0, primary_tree=0, secondary_tree=0, stat_offense=0, stat_flex=0, stat_defense=0):
     return {
         "participant_id": pid,
         "team": team,
@@ -184,6 +221,12 @@ def make_player(pid, team, champion_id, role, level, kills, deaths, assists, cs,
         "items": items,
         "is_buyer": is_buyer,
         "gold_current": gold_current if is_buyer else None,
+        "keystone": keystone,
+        "primary_tree": primary_tree,
+        "secondary_tree": secondary_tree,
+        "stat_offense": stat_offense,
+        "stat_flex": stat_flex,
+        "stat_defense": stat_defense,
     }
 
 

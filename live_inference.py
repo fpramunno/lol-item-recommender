@@ -72,6 +72,15 @@ def parse_live_state(data: dict) -> dict | None:
 
     my_team = me["team"]  # "ORDER" or "CHAOS"
 
+    # Stat runes (offense/flex/defense) only available for active player
+    full_runes = active.get("fullRunes", {})
+    stat_runes = full_runes.get("statRunes", [])
+    my_stat_runes = {
+        "stat_offense": stat_runes[0].get("id", 0) if len(stat_runes) > 0 else 0,
+        "stat_flex":    stat_runes[1].get("id", 0) if len(stat_runes) > 1 else 0,
+        "stat_defense": stat_runes[2].get("id", 0) if len(stat_runes) > 2 else 0,
+    }
+
     # Assign participant_id: ORDER = team 100 (1-5), CHAOS = team 200 (6-10)
     order_players  = [p for p in all_players if p["team"] == "ORDER"]
     chaos_players  = [p for p in all_players if p["team"] == "CHAOS"]
@@ -99,6 +108,13 @@ def parse_live_state(data: dict) -> dict | None:
 
             gold_current = int(active.get("currentGold", 0)) if is_buyer else None
 
+            p_runes = p.get("runes", {})
+            runes = {
+                "keystone":       p_runes.get("keystone",         {}).get("id", 0),
+                "primary_tree":   p_runes.get("primaryRuneTree",  {}).get("id", 0),
+                "secondary_tree": p_runes.get("secondaryRuneTree",{}).get("id", 0),
+                **(my_stat_runes if is_buyer else {"stat_offense": 0, "stat_flex": 0, "stat_defense": 0}),
+            }
             players.append({
                 "participant_id": pid,
                 "team":           team_id,
@@ -113,6 +129,7 @@ def parse_live_state(data: dict) -> dict | None:
                 "gold_current":   gold_current,
                 "items":          item_ids,
                 "is_buyer":       is_buyer,
+                **runes,
             })
 
     # Gold diff: estimated from gold_spent (totalGold not available in live API)
