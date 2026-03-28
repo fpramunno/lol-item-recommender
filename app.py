@@ -236,11 +236,9 @@ def _parse_cli():
     group.add_argument("--mlp",         action="store_true")
     group.add_argument("--transformer", action="store_true")
     group.add_argument("--checkpoint",  type=str, default=None)
-    try:
-        idx  = sys.argv.index("--")
-        args = parser.parse_args(sys.argv[idx + 1:])
-    except ValueError:
-        args = parser.parse_args([])
+    # Streamlit consumes "--" before the script runs, so sys.argv is already
+    # ["app.py", "--mlp"] — just parse everything after the script name.
+    args, _ = parser.parse_known_args(sys.argv[1:])
     return args
 
 _cli  = _parse_cli()
@@ -250,12 +248,12 @@ _arch = "mlp" if _cli.mlp else ("transformer" if _cli.transformer else None)
 # ── Load inference module once ────────────────────────────────────────────────
 @st.cache_resource(show_spinner="[ LOADING MODEL... ]")
 def _load_inf(arch: str | None, checkpoint: str | None):
-    import inference as _inf
-    # Always override — inference.py loads a default model at import time
-    _inf.model = _inf.load_model(
-        arch=arch,
-        checkpoint=checkpoint,
-    )
+    import io, contextlib
+    # inference.py auto-loads a default model at import time — suppress that print
+    with contextlib.redirect_stdout(io.StringIO()):
+        import inference as _inf
+    # Now load the actual requested model (this print IS shown)
+    _inf.model = _inf.load_model(arch=arch, checkpoint=checkpoint)
     return _inf
 
 inf = _load_inf(arch=_arch, checkpoint=_cli.checkpoint)
