@@ -113,8 +113,8 @@ streamlit run app.py -- --mlp
 python live_inference.py --mlp
 
 # Load a specific checkpoint
-streamlit run app.py -- --checkpoint checkpoints/transformer/2026-03-28_21-00-00/best_model.pt
-python live_inference.py --checkpoint checkpoints/transformer/2026-03-28_21-00-00/best_model.pt
+streamlit run app.py -- --checkpoint checkpoints/transformer/best_model_TRANSFORMER.pt
+python live_inference.py --checkpoint checkpoints/transformer/best_model_TRANSFORMER.pt
 ```
 
 If no flag is given, the best available checkpoint is loaded automatically.
