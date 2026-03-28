@@ -68,7 +68,7 @@ cp .env.example .env
 ```
 
 Download a model checkpoint from Google Drive and place it under `checkpoints/`:
-> **[Download checkpoint](https://drive.google.com/file/d/191ur4DDl3m7wdojLIOvzIHJvwtyUbFDK/view?usp=drive_link)**
+> **[Download checkpoint](https://drive.google.com/drive/folders/141aMKdmWNnapXo9F_5yyllljTKNysuTe?usp=sharing)**
 
 ---
 
