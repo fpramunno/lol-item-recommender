@@ -10,7 +10,7 @@
 
 # Teacher — LoL Item Recommender
 
-A machine learning model that recommends the next best item to buy in League of Legends, based on the current game state (champion, role, KDA, CS, gold, items owned, team composition, runes).
+An AI that recommends the next best item to buy in League of Legends, based on the full live game state: your champion, role, KDA, CS, gold, items owned, runes, and the entire team composition.
 
 Works in real time via the Riot Live Client Data API — no manual input required.
 
@@ -18,19 +18,24 @@ Works in real time via the Riot Live Client Data API — no manual input require
 
 ## How it works
 
-The model is an MLP trained on ~450k item purchase events from high-elo EUW matches (Challenger/Grandmaster/Master). For each purchase, the model receives a snapshot of the full game state and predicts which item was bought.
+The model is trained on millions of item purchase events from high-elo EUW matches (Challenger / Grandmaster / Master). At each purchase, it receives a snapshot of the full game state and learns to predict which item was bought.
 
-**Input:** 4112 features
-- Global: game time, team gold difference
-- Per player (×10): level, KDA, CS, gold spent, current gold, items owned (binary), champion one-hot, champion tags, role, champion base stats
+**Input — 4482 features per sample**
+| Feature group | Details |
+|---|---|
+| Global (×2) | Game time, team gold difference |
+| Per player (×10 × 448) | Level, KDA, CS, gold spent, current gold, items owned (binary), champion one-hot, champion tags, role, base stats, runes |
 
-**Training:** reward-weighted cross-entropy
-- Reward = win/loss (±1) + 0.3 × normalized gold earned in the next 4 minutes
-- Fog of war masking: enemy features are randomly zeroed (p=0.5) during training
+**Training**
+- Loss: reward-weighted cross-entropy
+- Reward: win/loss (±1) + 0.3 × normalized gold earned in the next 4 minutes
+- Fog of war: enemy player features randomly zeroed (p=0.5) at training and validation time
 
-**Output:** probability distribution over 207 items → top-K recommendations
+**Output:** probability distribution over ~200 items → top-K recommendations
 
-See [`model_summary.md`](model_summary.md) for full details.
+**Architectures** (selectable via config file)
+- `MLP` — flat feed-forward network, fast and strong baseline (~5M params)
+- `Transformer` — per-player token attention + FiLM conditioning on game context (~2.5M params, faster convergence)
 
 ---
 
@@ -44,12 +49,10 @@ cd lol-item-recommender
 **Install Python 3.12**
 
 Option A — Microsoft Store (Windows, easiest):
-```
+```bash
 winget install Python.Python.3.12
 ```
-
-Option B — Official installer: https://www.python.org/downloads/release/python-3120/
-> Check **"Add Python to PATH"** during installation.
+Option B — [Official installer](https://www.python.org/downloads/release/python-3120/) — check **"Add Python to PATH"** during installation.
 
 ```bash
 python -m venv venv
@@ -64,24 +67,58 @@ Copy `.env.example` to `.env` and add your [Riot API key](https://developer.riot
 cp .env.example .env
 ```
 
-Download the model checkpoint from Google Drive and place it in `checkpoints/best_model.pt`:
+Download a model checkpoint from Google Drive and place it under `checkpoints/`:
 > **[Download checkpoint](https://drive.google.com/file/d/191ur4DDl3m7wdojLIOvzIHJvwtyUbFDK/view?usp=drive_link)**
 
 ---
 
 ## Live usage (in-game)
 
-Start a League of Legends game, then run:
+Start a League of Legends game, then choose your preferred interface:
+
+### Browser UI (recommended)
+
+```bash
+streamlit run app.py
+```
+
+A browser window opens automatically. The app fetches live game data every 5 seconds and shows the top-5 recommended items with icons and confidence bars. No input needed — everything is read from the running game.
+
+### Terminal
 
 ```bash
 python live_inference.py
 ```
 
-The tool automatically detects item purchases and shows the top-5 recommendations. Press `ENTER` to refresh manually.
+Shows top-5 recommendations in the terminal. Updates automatically when you buy an item. Press `ENTER` to refresh manually.
 
 ---
 
-## Run test scenarios
+### Selecting a model
+
+Both interfaces accept the same flags:
+
+```bash
+# Load the best Transformer checkpoint
+streamlit run app.py -- --transformer
+python live_inference.py --transformer
+
+# Load the best MLP checkpoint
+streamlit run app.py -- --mlp
+python live_inference.py --mlp
+
+# Load a specific checkpoint
+streamlit run app.py -- --checkpoint checkpoints/transformer/2026-03-28_21-00-00/best_model.pt
+python live_inference.py --checkpoint checkpoints/transformer/2026-03-28_21-00-00/best_model.pt
+```
+
+If no flag is given, the best available checkpoint is loaded automatically.
+
+---
+
+## Run offline scenarios
+
+Test the model without being in a game:
 
 ```bash
 # 3 random scenarios
@@ -91,28 +128,54 @@ python inference.py
 python inference.py --champion 54 --role TOP --n 5
 ```
 
+Evaluate a checkpoint on the validation set:
+
+```bash
+python evaluate.py
+python evaluate.py --checkpoint checkpoints/transformer/2026-03-28_21-00-00/best_model.pt
+```
+
+---
+
+## Train
+
+Training is configured via YAML files in `configs/`. Two presets are included:
+
+```bash
+# Transformer (recommended)
+python train.py --config configs/transformer.yaml
+
+# MLP baseline
+python train.py --config configs/mlp.yaml
+
+# Resume a run
+python train.py --config configs/transformer.yaml --resume checkpoints/transformer/2026-03-28_21-00-00/ckpt_step50000.pt
+```
+
+Checkpoints are saved to `checkpoints/{config_name}/{datetime}/`. Training is logged to [Weights & Biases](https://wandb.ai).
+
 ---
 
 ## Retrain from scratch
 
 ```bash
-# 1. Collect data (requires Riot API key)
+# 1. Collect data (requires Riot API key in .env)
 python downloader.py --all
 
-# 2. Parse timelines into samples
+# 2. Parse match timelines into purchase events
 python parser.py
 
-# 3. Compute normalization stats
+# 3. Compute normalization statistics
 python compute_stats.py
 
-# 4. Preprocess into numpy arrays
+# 4. Preprocess into sharded numpy arrays
 python preprocess.py
 
-# 5. Compute baselines
+# 5. Compute random / most-frequent baselines
 python baseline.py
 
 # 6. Train
-python train.py
+python train.py --config configs/transformer.yaml
 ```
 
 ---
@@ -122,15 +185,15 @@ python train.py
 ```
 Riot API
   ↓ downloader.py
-data/timelines/        ← raw match JSON
-data/match_participants.json  ← champion, role, runes per player
+data/timelines/                     ← raw match JSON
+data/match_participants.json        ← champion, role, runes per player
   ↓ parser.py
-data/dataset/samples.jsonl    ← (X, y, R) per purchase event
+data/dataset/samples.jsonl          ← (X, y, R) per purchase event
   ↓ compute_stats.py + preprocess.py
-data/processed/X.npy, y.npy, R.npy
-  ↓ train.py
-checkpoints/best_model.pt
-  ↓ inference.py / live_inference.py
+data/processed/shards/X_NNN.npy … ← sharded numpy arrays (mmap-friendly)
+  ↓ train.py --config configs/*.yaml
+checkpoints/{config}/{datetime}/best_model.pt
+  ↓ app.py / live_inference.py / inference.py
 top-K item recommendations
 ```
 
@@ -140,5 +203,7 @@ top-K item recommendations
 
 - Python 3.11+
 - PyTorch
-- Riot API key (personal key recommended for data collection)
-- League of Legends client (for live mode)
+- Streamlit (browser UI)
+- Weights & Biases (training logs)
+- Riot API key (data collection only)
+- League of Legends client (live mode)
