@@ -9,16 +9,15 @@ from pathlib import Path
 import logging
 import itertools
 import wandb
-from concurrent.futures import ThreadPoolExecutor
+import yaml
 
-from model import ItemRecommender, reward_weighted_loss
+from model import build_model, reward_weighted_loss
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-PROCESSED_DIR  = Path("data/processed/shards")
-CHECKPOINT_DIR = Path("checkpoints")
-CHECKPOINT_DIR.mkdir(exist_ok=True)
+PROCESSED_DIR    = Path("data/processed/shards")
+CHECKPOINTS_ROOT = Path("checkpoints")
 
 # ── Wandb configuration ───────────────────────────────────────────────────────
 
@@ -72,32 +71,78 @@ def apply_fog_of_war(X_batch: torch.Tensor, input_dim: int, mask_prob: float) ->
 
 # ── Training ──────────────────────────────────────────────────────────────────
 
+def _build_run_name(arch_config: dict) -> str:
+    arch = arch_config["arch"]
+    if arch == "transformer":
+        return (f"transformer-d{arch_config['d_model']}"
+                f"-h{arch_config['n_heads']}"
+                f"-l{arch_config['n_layers']}"
+                f"-ffn{arch_config['ffn_dim']}")
+    else:
+        dims = "-".join(str(d) for d in arch_config["hidden_dims"])
+        return f"mlp-{dims}"
+
+
 def train():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--hidden-dims",   type=int,   nargs="+", default=HIDDEN_DIMS)
-    parser.add_argument("--dropout",       type=float, default=DROPOUT)
-    parser.add_argument("--batch-size",    type=int,   default=BATCH_SIZE)
-    parser.add_argument("--total-steps",   type=int,   default=TOTAL_STEPS)
-    parser.add_argument("--lr",            type=float, default=LR)
+    parser.add_argument("--config",        type=str,   default=None,   help="Path to YAML config file (e.g. configs/transformer.yaml)")
+    parser.add_argument("--resume",        type=str,   default=None,   help="Path to checkpoint to resume from")
     parser.add_argument("--device",        type=str,   default=DEVICE)
-    parser.add_argument("--fog-mask-prob", type=float, default=FOG_MASK_PROB)
     parser.add_argument("--num-workers",   type=int,   default=0)
-    parser.add_argument("--lr-patience",   type=int,   default=3, help="Shard epochs without val improvement before halving LR")
-    parser.add_argument("--resume",        type=str,   default=None, help="Checkpoint filename to resume from (e.g. best_model.pt or ckpt_step5000.pt)")
+    # CLI overrides (override YAML values when provided)
+    parser.add_argument("--arch",          type=str,   default=None,   choices=["mlp", "transformer"])
+    parser.add_argument("--hidden-dims",   type=int,   nargs="+",      default=None)
+    parser.add_argument("--d-model",       type=int,   default=None)
+    parser.add_argument("--n-heads",       type=int,   default=None)
+    parser.add_argument("--n-layers",      type=int,   default=None)
+    parser.add_argument("--ffn-dim",       type=int,   default=None)
+    parser.add_argument("--dropout",       type=float, default=None)
+    parser.add_argument("--batch-size",    type=int,   default=None)
+    parser.add_argument("--total-steps",   type=int,   default=None)
+    parser.add_argument("--lr",            type=float, default=None)
+    parser.add_argument("--fog-mask-prob", type=float, default=None)
+    parser.add_argument("--lr-patience",   type=int,   default=None)
     args = parser.parse_args()
 
-    hidden_dims   = args.hidden_dims
-    dropout       = args.dropout
-    batch_size    = args.batch_size
-    total_steps   = args.total_steps
-    lr            = args.lr
-    device        = args.device
-    fog_mask_prob = args.fog_mask_prob
-    num_workers   = args.num_workers
-    lr_patience   = args.lr_patience
+    # Load config: YAML base, then CLI overrides on top
+    cfg = {}
+    if args.config:
+        with open(args.config) as f:
+            cfg = yaml.safe_load(f)
+        log.info(f"Loaded config: {args.config}")
+    else:
+        log.warning("No --config provided, using built-in defaults.")
 
-    log.info(f"Device: {device}")
+    def _get(key, default):
+        cli_val = getattr(args, key.replace("-", "_"), None)
+        return cli_val if cli_val is not None else cfg.get(key, default)
+
+    arch_config = {
+        "arch":        _get("arch",        "mlp"),
+        "hidden_dims": _get("hidden_dims", HIDDEN_DIMS),
+        "d_model":     _get("d_model",     256),
+        "n_heads":     _get("n_heads",     8),
+        "n_layers":    _get("n_layers",    4),
+        "ffn_dim":     _get("ffn_dim",     512),
+        "dropout":     _get("dropout",     DROPOUT),
+    }
+    dropout       = arch_config["dropout"]
+    batch_size    = _get("batch_size",    BATCH_SIZE)
+    total_steps   = _get("total_steps",   TOTAL_STEPS)
+    lr            = _get("lr",            LR)
+    fog_mask_prob = _get("fog_mask_prob", FOG_MASK_PROB)
+    lr_patience   = _get("lr_patience",   3)
+    num_workers   = args.num_workers
+    device        = args.device
+    hidden_dims   = arch_config["hidden_dims"]
+
+    from datetime import datetime
+    run_time       = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    config_name    = Path(args.config).stem if args.config else arch_config["arch"]
+    CHECKPOINT_DIR = CHECKPOINTS_ROOT / config_name / run_time
+    CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
+    log.info(f"Device: {device} | Checkpoint dir: {CHECKPOINT_DIR}")
 
     # Discover shards
     shard_files = sorted(PROCESSED_DIR.glob("X_*.npy"))
@@ -125,7 +170,7 @@ def train():
     log.info(f"Train shards: {len(train_ids)} | Val samples: {val_size}")
 
     # Model
-    model     = ItemRecommender(input_dim, output_dim, hidden_dims, dropout).to(device)
+    model     = build_model(arch_config, input_dim, output_dim).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=lr_patience, factor=0.5)
     n_params  = sum(p.numel() for p in model.parameters())
@@ -134,17 +179,26 @@ def train():
     # Resume
     global_step = 0
     if args.resume:
-        ckpt = torch.load(CHECKPOINT_DIR / args.resume, map_location=device)
+        resume_path = Path(args.resume)
+        if not resume_path.is_absolute():
+            # search legacy checkpoints root for backwards compatibility
+            resume_path = CHECKPOINTS_ROOT / args.resume
+        ckpt = torch.load(resume_path, map_location=device)
+        # If resuming, use the arch from checkpoint (ignore CLI arch flags)
+        if "arch_config" in ckpt:
+            arch_config = ckpt["arch_config"]
+            model = build_model(arch_config, input_dim, output_dim).to(device)
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         model.load_state_dict(ckpt["model_state"])
         optimizer.load_state_dict(ckpt["optimizer_state"])
         global_step = ckpt.get("step", 0)
-        log.info(f"Resumed from {args.resume} at step {global_step}")
+        log.info(f"Resumed from {args.resume} at step {global_step} (arch={arch_config['arch']})")
 
     # Wandb
     wandb.init(
         project=WANDB_PROJECT,
         entity=WANDB_ENTITY,
-        name=WANDB_RUN_NAME,
+        name=_build_run_name(arch_config),
         config={
             "hidden_dims":   hidden_dims,
             "dropout":       dropout,
@@ -222,32 +276,26 @@ def train():
 
     model.train()
     stop_training = False
-    executor = ThreadPoolExecutor(max_workers=1)
-
-    def _load_shard(sid):
-        return ShardDataset(PROCESSED_DIR, sid)
 
     for shard_epoch in itertools.count(1):
         if stop_training:
             break
         log.info(f"--- Shard epoch {shard_epoch} ---")
-        shard_order = list(np.random.permutation(train_ids))
-        prefetch = executor.submit(_load_shard, shard_order[0])
-        for i, sid in enumerate(shard_order):
+        for sid in np.random.permutation(train_ids):
             if stop_training:
                 break
-            ds = prefetch.result()
-            if i + 1 < len(shard_order):
-                prefetch = executor.submit(_load_shard, shard_order[i + 1])
-            loader = DataLoader(ds, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-            for X_batch, y_batch, R_batch in loader:
+            X_mm = np.load(PROCESSED_DIR / f"X_{sid:03d}.npy", mmap_mode="r")
+            y_mm = np.load(PROCESSED_DIR / f"y_{sid:03d}.npy", mmap_mode="r")
+            R_mm = np.load(PROCESSED_DIR / f"R_{sid:03d}.npy", mmap_mode="r")
+            n = len(y_mm)
+            for start in range(0, n, batch_size):
+                end = min(start + batch_size, n)
+                X_batch = torch.tensor(np.array(X_mm[start:end]), dtype=torch.float32).to(device)
+                y_batch = torch.tensor(np.array(y_mm[start:end]), dtype=torch.long).to(device)
+                R_batch = torch.tensor(np.array(R_mm[start:end]), dtype=torch.float32).to(device)
                 if global_step >= total_steps:
                     stop_training = True
                     break
-
-                X_batch = X_batch.to(device)
-                y_batch = y_batch.to(device)
-                R_batch = R_batch.to(device)
 
                 optimizer.zero_grad()
                 X_batch = apply_fog_of_war(X_batch, input_dim, fog_mask_prob)
@@ -278,6 +326,7 @@ def train():
                         "step": global_step, "model_state": model.state_dict(),
                         "optimizer_state": optimizer.state_dict(),
                         "input_dim": input_dim, "output_dim": output_dim,
+                        "arch_config": arch_config,
                     }, ckpt_path)
                     log.info(f"  Checkpoint saved: {ckpt_path.name}")
 
@@ -304,6 +353,7 @@ def train():
                             "optimizer_state": optimizer.state_dict(),
                             "val_loss": val_loss, "top1_acc": top1_acc,
                             "input_dim": input_dim, "output_dim": output_dim,
+                            "arch_config": arch_config,
                         }, path)
                         log.info(f"  ✓ New best model saved (val_loss={val_loss:.4f})")
                         try:
@@ -311,7 +361,6 @@ def train():
                         except Exception as e:
                             log.warning(f"wandb.save failed: {e}")
 
-    executor.shutdown(wait=False)
     wandb.finish()
     log.info("Training complete.")
 

@@ -260,4 +260,19 @@ def run():
 
 
 if __name__ == "__main__":
+    import argparse
+    import inference as _inf
+    parser = argparse.ArgumentParser()
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--mlp",         action="store_true", help="Load best MLP model")
+    group.add_argument("--transformer", action="store_true", help="Load best Transformer model")
+    group.add_argument("--checkpoint",  type=str, default=None,
+                       help="Path to a specific checkpoint, e.g. checkpoints/transformer/2026-03-28_21-00-00/best_model.pt")
+    cli = parser.parse_args()
+    if cli.mlp:
+        _inf.model = _inf.load_model(arch="mlp")
+    elif cli.transformer:
+        _inf.model = _inf.load_model(arch="transformer")
+    elif cli.checkpoint:
+        _inf.model = _inf.load_model(checkpoint=cli.checkpoint)
     run()

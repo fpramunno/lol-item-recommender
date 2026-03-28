@@ -7,23 +7,55 @@ import json
 import torch
 import numpy as np
 from pathlib import Path
-from model import ItemRecommender
+from model import build_model
 
 PROCESSED_DIR  = Path("data/processed")
 CHECKPOINT_DIR = Path("checkpoints")
 
 # ── Load resources ─────────────────────────────────────────────────────────────
 
-def load_model():
-    ckpt = torch.load(CHECKPOINT_DIR / "best_model.pt", map_location="cpu")
-    model = ItemRecommender(
-        input_dim=ckpt["input_dim"],
-        output_dim=ckpt["output_dim"],
-        hidden_dims=[1024, 512, 256],
-        dropout=0.0,
-    )
+def load_model(checkpoint: str = None, arch: str = None):
+    if checkpoint:
+        model_path = Path(checkpoint)
+    elif arch:
+        # match by config name (e.g. "transformer", "transformer_large", "mlp")
+        candidates = list(CHECKPOINT_DIR.glob(f"*{arch}*/*/best_model.pt"))
+        if not candidates:
+            raise FileNotFoundError(f"No best_model.pt found matching '{arch}' in checkpoints/")
+        # Pick the one with lowest val_loss stored in the checkpoint
+        def _val_loss(p):
+            try:
+                return torch.load(p, map_location="cpu").get("val_loss", float("inf"))
+            except Exception:
+                return float("inf")
+        model_path = min(candidates, key=_val_loss)
+    else:
+        legacy = CHECKPOINT_DIR / "best_model.pt"
+        if legacy.exists():
+            model_path = legacy
+        else:
+            candidates = sorted(CHECKPOINT_DIR.glob("*/*/best_model.pt"))
+            if not candidates:
+                raise FileNotFoundError("No best_model.pt found in checkpoints/")
+            model_path = candidates[-1]
+    ckpt        = torch.load(model_path, map_location="cpu")
+    arch_config = ckpt.get("arch_config", {"arch": "mlp", "hidden_dims": [1024, 512, 256], "dropout": 0.0})
+    model       = build_model(arch_config, ckpt["input_dim"], ckpt["output_dim"])
     model.load_state_dict(ckpt["model_state"])
     model.eval()
+    n_params = sum(p.numel() for p in model.parameters())
+    arch = arch_config["arch"]
+    step = ckpt.get("step", "?")
+    if arch == "transformer":
+        desc = (f"Transformer  d_model={arch_config.get('d_model')}  "
+                f"n_heads={arch_config.get('n_heads')}  "
+                f"n_layers={arch_config.get('n_layers')}  "
+                f"ffn_dim={arch_config.get('ffn_dim')}")
+    else:
+        desc = f"MLP  hidden={arch_config.get('hidden_dims')}"
+    print(f"  Model loaded: {desc}")
+    print(f"  Parameters  : {n_params:,}")
+    print(f"  Checkpoint  : {model_path}  (step {step})")
     return model
 
 def load_item_names() -> dict[int, str]:

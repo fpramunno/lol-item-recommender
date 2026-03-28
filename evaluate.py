@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader, ConcatDataset
 from pathlib import Path
 import logging
 
-from model import ItemRecommender, reward_weighted_loss
+from model import build_model, reward_weighted_loss
 from train import ShardDataset, apply_fog_of_war
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -44,12 +44,13 @@ def main():
     log.info(f"Validation shards: {val_ids}")
 
     ckpt_path = CHECKPOINT_DIR / args.checkpoint
-    ckpt = torch.load(ckpt_path, map_location=args.device)
-    input_dim  = ckpt["input_dim"]
-    output_dim = ckpt["output_dim"]
-    log.info(f"Loaded checkpoint: {ckpt_path.name} (step={ckpt.get('step', '?')})")
+    ckpt        = torch.load(ckpt_path, map_location=args.device)
+    input_dim   = ckpt["input_dim"]
+    output_dim  = ckpt["output_dim"]
+    arch_config = ckpt.get("arch_config", {"arch": "mlp", "hidden_dims": [1024, 512, 256], "dropout": 0.0})
+    log.info(f"Loaded checkpoint: {ckpt_path.name} (step={ckpt.get('step', '?')}, arch={arch_config['arch']})")
 
-    model = ItemRecommender(input_dim, output_dim, hidden_dims=[1024, 512, 256], dropout=0.0)
+    model = build_model(arch_config, input_dim, output_dim)
     model.load_state_dict(ckpt["model_state"])
     model.to(args.device)
     model.eval()

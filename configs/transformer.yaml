@@ -1,0 +1,14 @@
+# ── Architecture ──────────────────────────────────────────────────────────────
+arch: transformer
+d_model: 256
+n_heads: 8
+n_layers: 4
+ffn_dim: 512
+dropout: 0.1
+
+# ── Training ──────────────────────────────────────────────────────────────────
+lr: 0.0003
+batch_size: 512
+total_steps: 500000
+fog_mask_prob: 0.5
+lr_patience: 3
